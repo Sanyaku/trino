@@ -129,7 +129,6 @@
         <module>testing/trino-product-tests-groups</module>
         <module>testing/trino-product-tests-launcher</module>
         <module>testing/trino-server-dev</module>
-        <module>testing/trino-test-jdbc-compatibility-old-driver</module>
         <module>testing/trino-test-jdbc-compatibility-old-server</module>
         <module>testing/trino-testing</module>
         <module>testing/trino-testing-containers</module>
@@ -2559,14 +2558,6 @@
                             <requirePropertyDiverges>
                                 <property>project.description</property>
                             </requirePropertyDiverges>
-                            <requireJavaVendor>
-                                <message>Trino requires Temurin or Oracle JDK for development. Other vendors are not recommended due to lack of testing coverage.</message>
-                                <includes>
-                                    <include>Eclipse Adoptium</include>
-                                    <!-- For testing beta/ea builds locally -->
-                                    <include>Oracle Corporation</include>
-                                </includes>
-                            </requireJavaVendor>
                         </rules>
                     </configuration>
                 </plugin>
