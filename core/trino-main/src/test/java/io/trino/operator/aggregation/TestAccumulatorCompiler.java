@@ -14,6 +14,7 @@
 package io.trino.operator.aggregation;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -39,10 +40,13 @@ import io.trino.sql.gen.IsolatedClass;
 import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandle;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 
 import static io.trino.metadata.GlobalFunctionCatalog.builtinFunctionName;
 import static io.trino.operator.aggregation.AccumulatorCompiler.generateAccumulatorFactory;
+import static io.trino.operator.aggregation.AggregationFunctionAdapter.AggregationParameterKind;
 import static io.trino.operator.aggregation.AggregationFunctionAdapter.AggregationParameterKind.INPUT_CHANNEL;
 import static io.trino.operator.aggregation.AggregationFunctionAdapter.AggregationParameterKind.STATE;
 import static io.trino.operator.aggregation.AggregationFunctionAdapter.normalizeInputMethod;
@@ -56,15 +60,22 @@ public class TestAccumulatorCompiler
     @Test
     public void testAccumulatorCompilerForTypeSpecificObjectParameter()
     {
-        testAccumulatorCompilerForTypeSpecificObjectParameter(true);
-        testAccumulatorCompilerForTypeSpecificObjectParameter(false);
+        testAccumulatorCompilerForTypeSpecificObjectParameter(LongTimestampAggregation.class, true);
+        testAccumulatorCompilerForTypeSpecificObjectParameter(LongTimestampAggregation.class, false);
     }
 
-    private void testAccumulatorCompilerForTypeSpecificObjectParameter(boolean specializedLoops)
+    @Test
+    public void testAccumulatorCompilerForTypeSpecificObjectParameterMultipleInputArgs()
+    {
+        testAccumulatorCompilerForTypeSpecificObjectParameter(MultiArgumentLongTimestampAggregation.class, true);
+        testAccumulatorCompilerForTypeSpecificObjectParameter(MultiArgumentLongTimestampAggregation.class, false);
+    }
+
+    private <A> void testAccumulatorCompilerForTypeSpecificObjectParameter(Class<A> aggregation, boolean specializedLoops)
     {
         TimestampType parameterType = TimestampType.TIMESTAMP_NANOS;
         assertThat(parameterType.getJavaType()).isEqualTo(LongTimestamp.class);
-        assertGenerateAccumulator(LongTimestampAggregation.class, LongTimestampAggregationState.class, specializedLoops);
+        assertGenerateAccumulator(aggregation, LongTimestampAggregationState.class, specializedLoops);
     }
 
     @Test
@@ -102,12 +113,19 @@ public class TestAccumulatorCompiler
         AccumulatorStateSerializer<S> stateSerializer = StateCompiler.generateStateSerializer(stateInterface);
         AccumulatorStateFactory<S> stateFactory = StateCompiler.generateStateFactory(stateInterface);
 
+        Class<?>[] inputArgTypes = Arrays.stream(aggregation.getMethods())
+                .filter(m -> m.getName().equals("input")).findFirst().get()
+                .getParameterTypes();
+        int inputArgCount = inputArgTypes.length - 1;
+
         BoundSignature signature = new BoundSignature(
                 builtinFunctionName("longTimestampAggregation"),
                 RealType.REAL,
-                ImmutableList.of(TIMESTAMP_PICOS));
-        MethodHandle inputFunction = methodHandle(aggregation, "input", stateInterface, LongTimestamp.class);
-        inputFunction = normalizeInputMethod(inputFunction, signature, STATE, INPUT_CHANNEL);
+                Collections.nCopies(inputArgCount, TIMESTAMP_PICOS));
+        MethodHandle inputFunction = methodHandle(aggregation, "input", inputArgTypes);
+        inputFunction = normalizeInputMethod(
+                inputFunction, signature,
+                Lists.asList(STATE, Collections.nCopies(inputArgCount, INPUT_CHANNEL).toArray(AggregationParameterKind[]::new)));
         MethodHandle combineFunction = methodHandle(aggregation, "combine", stateInterface, stateInterface);
         MethodHandle outputFunction = methodHandle(aggregation, "output", stateInterface, BlockBuilder.class);
         AggregationImplementation implementation = AggregationImplementation.builder()
@@ -116,7 +134,7 @@ public class TestAccumulatorCompiler
                 .outputFunction(outputFunction)
                 .accumulatorStateDescriptor(stateInterface, stateSerializer, stateFactory)
                 .build();
-        FunctionNullability functionNullability = new FunctionNullability(false, ImmutableList.of(false));
+        FunctionNullability functionNullability = new FunctionNullability(false, Collections.nCopies(inputArgCount, false));
 
         // test if we can compile aggregation
         AccumulatorFactory accumulatorFactory = generateAccumulatorFactory(signature, implementation, functionNullability, specializedLoops);
@@ -131,17 +149,17 @@ public class TestAccumulatorCompiler
         windowAccumulator.output(new LongArrayBlockBuilder(null, 1));
 
         TestingAggregationFunction aggregationFunction = new TestingAggregationFunction(
-                ImmutableList.of(TIMESTAMP_PICOS),
+                Collections.nCopies(inputArgCount, TIMESTAMP_PICOS),
                 ImmutableList.of(BIGINT),
                 BIGINT,
                 accumulatorFactory);
-        assertThat(AggregationTestUtils.aggregation(aggregationFunction, createPage(1234))).isEqualTo(1234L);
+        assertThat(AggregationTestUtils.aggregation(aggregationFunction, createPage(1234, inputArgCount))).isEqualTo(1234L);
     }
 
-    private static Page createPage(int count)
+    private static Page createPage(int count, int repeat)
     {
         Block timestampSequenceBlock = createTimestampSequenceBlock(count);
-        return new Page(timestampSequenceBlock.getPositionCount(), timestampSequenceBlock);
+        return new Page(timestampSequenceBlock.getPositionCount(), Collections.nCopies(repeat, timestampSequenceBlock).toArray(Block[]::new));
     }
 
     private static Block createTimestampSequenceBlock(int count)
