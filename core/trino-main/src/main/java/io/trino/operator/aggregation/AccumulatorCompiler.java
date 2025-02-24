@@ -87,6 +87,8 @@ import static java.util.Objects.requireNonNull;
 
 public final class AccumulatorCompiler
 {
+    private static final int MAX_ARGS_FOR_SPECIALIZED_LOOP = 6;
+
     private AccumulatorCompiler() {}
 
     public static AccumulatorFactory generateAccumulatorFactory(
@@ -565,11 +567,12 @@ public final class AccumulatorCompiler
             CallSiteBinder callSiteBinder,
             boolean grouped)
     {
-        if (specializedLoops) {
+        int parameterCount = parameterVariables.size();
+        if (specializedLoops && parameterCount <= MAX_ARGS_FOR_SPECIALIZED_LOOP) {
             BytecodeBlock newBlock = new BytecodeBlock();
             Variable thisVariable = scope.getThis();
 
-            MethodHandle mainLoop = buildLoop(inputFunction, stateField.size(), parameterVariables.size(), grouped);
+            MethodHandle mainLoop = buildLoop(inputFunction, stateField.size(), parameterCount, grouped);
 
             ImmutableList.Builder<BytecodeExpression> parameters = ImmutableList.builder();
             parameters.add(mask);
