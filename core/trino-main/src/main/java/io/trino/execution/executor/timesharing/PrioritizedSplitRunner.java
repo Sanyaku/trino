@@ -46,7 +46,7 @@ public final class PrioritizedSplitRunner
     private static final Logger log = Logger.get(PrioritizedSplitRunner.class);
 
     // each time we run a split, run it for this length before returning to the pool
-    public static final Duration SPLIT_RUN_QUANTA = new Duration(1, TimeUnit.SECONDS);
+    public static final Duration SPLIT_RUN_QUANTA = new Duration(2, TimeUnit.SECONDS);
 
     private final long createdNanos = System.nanoTime();
 

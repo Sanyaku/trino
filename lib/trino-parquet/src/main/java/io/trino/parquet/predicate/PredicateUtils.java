@@ -16,6 +16,7 @@ package io.trino.parquet.predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.Slices;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.trino.parquet.BloomFilterStore.getBloomFilterStore;
 import static io.trino.parquet.ParquetCompressionUtils.decompress;
@@ -84,6 +86,7 @@ public final class PredicateUtils
     // and when the dictionary does not eliminate a row-group, the work done to
     // decode the dictionary and match it with predicates is wasted.
     private static final int MAX_DICTIONARY_SIZE = 8096;
+    private static final Logger log = Logger.get(PredicateUtils.class);
 
     private PredicateUtils() {}
 
@@ -202,6 +205,8 @@ public final class PredicateUtils
             throws IOException
     {
         ImmutableList.Builder<RowGroupInfo> rowGroupInfoBuilder = ImmutableList.builder();
+        int filteredRowGroup = 0;
+        AtomicInteger filteredRowGroupFromBloomFilter = new AtomicInteger(0);
         for (BlockMetadata block : parquetMetadata.getBlocks(splitStart, splitLength)) {
             for (int i = 0; i < parquetTupleDomains.size(); i++) {
                 TupleDomain<ColumnDescriptor> parquetTupleDomain = parquetTupleDomains.get(i);
@@ -225,6 +230,8 @@ public final class PredicateUtils
                 }
             }
         }
+        log.info("Skipped rowGroup for parquetFile: %s, totalFilteredRowGroup: %s, filteredRowGroupFromBloomFilter: %s, totalRowGroup: %s",
+                dataSource.getId(), filteredRowGroup, filteredRowGroupFromBloomFilter.get(), parquetMetadata.getBlocks().size());
         return rowGroupInfoBuilder.build();
     }
 
