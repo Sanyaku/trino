@@ -404,6 +404,8 @@ public class InMemoryTransactionManager
                     // Should not happen normally
                     throw new IllegalStateException("Current transaction already committed");
                 }
+                log.info("Transaction already aborted transactionId: %s", transactionId);
+                logStackTrace(String.format("checkOpenTransaction: completedSuccessfully: %s", completedSuccessfully.get()));
                 throw new TrinoException(TRANSACTION_ALREADY_ABORTED, "Current transaction is aborted, commands ignored until end of transaction block");
             }
         }
@@ -486,6 +488,7 @@ public class InMemoryTransactionManager
         public synchronized ListenableFuture<Void> asyncCommit()
         {
             if (!completedSuccessfully.compareAndSet(null, true)) {
+                logStackTrace(String.format("asyncCommit: completedSuccessfully changed from non-null to %s", completedSuccessfully.get()));
                 if (completedSuccessfully.get()) {
                     // Already done
                     return immediateVoidFuture();
@@ -493,6 +496,7 @@ public class InMemoryTransactionManager
                 // Transaction already aborted
                 return immediateFailedFuture(new TrinoException(TRANSACTION_ALREADY_ABORTED, "Current transaction has already been aborted"));
             }
+            logStackTrace(String.format("asyncCommit: completedSuccessfully: %s", completedSuccessfully.get()));
 
             String commitBlockedReason = commitBlocked.get();
             if (commitBlockedReason != null) {
@@ -537,6 +541,7 @@ public class InMemoryTransactionManager
         public synchronized ListenableFuture<Void> asyncAbort()
         {
             if (!completedSuccessfully.compareAndSet(null, false)) {
+                logStackTrace(String.format("asyncAbort: completedSuccessfully changed from non-null to %s", completedSuccessfully.get()));
                 if (completedSuccessfully.get()) {
                     // Should not happen normally
                     return immediateFailedFuture(new IllegalStateException("Current transaction already committed"));
@@ -544,7 +549,14 @@ public class InMemoryTransactionManager
                 // Already done
                 return immediateVoidFuture();
             }
+            logStackTrace(String.format("asyncAbort: completedSuccessfully: %s", completedSuccessfully.get()));
             return abortInternal();
+        }
+
+        private void logStackTrace(String prefix) {
+            for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+                log.debug("%s - %s", prefix, element.toString());
+            }
         }
 
         private synchronized ListenableFuture<Void> abortInternal()
@@ -574,7 +586,7 @@ public class InMemoryTransactionManager
                     .sorted()
                     .toList();
 
-            return new TransactionInfo(
+            TransactionInfo transactionInfo = new TransactionInfo(
                     transactionId,
                     isolationLevel,
                     readOnly,
@@ -584,6 +596,9 @@ public class InMemoryTransactionManager
                     catalogNames,
                     writtenCatalogName,
                     ImmutableSet.copyOf(activeCatalogs.keySet()));
+            log.debug("getTransactionInfo details: %s", transactionInfo.toString());
+
+            return transactionInfo;
         }
     }
 }
