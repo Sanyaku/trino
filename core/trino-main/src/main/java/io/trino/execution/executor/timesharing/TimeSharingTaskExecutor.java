@@ -570,9 +570,9 @@ public class TimeSharingTaskExecutor
                         }
 
                         if (split.isFinished()) {
-                            if (log.isDebugEnabled()) {
-                                log.debug("%s is finished", split.getInfo());
-                            }
+//                            if (log.isDebugEnabled()) {
+                            log.info("%s is finished", split.getInfo());
+//                            }
                             splitFinished(split);
                         }
                         else {
