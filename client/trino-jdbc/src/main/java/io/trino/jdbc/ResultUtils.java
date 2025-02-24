@@ -28,7 +28,7 @@ class ResultUtils
     static SQLException resultsException(QueryStatusInfo results)
     {
         QueryError error = requireNonNull(results.getError());
-        String message = format("Query failed (#%s): %s", results.getId(), error.getMessage());
+        String message = format("Query failed (#%s): %s. QueryStatusInfo result: %s", results.getId(), error.getMessage(), results);
         Throwable cause = (error.getFailureInfo() == null) ? null : error.getFailureInfo().toException();
         return new SQLException(message, error.getSqlState(), error.getErrorCode(), cause);
     }

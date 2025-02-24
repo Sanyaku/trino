@@ -13,6 +13,10 @@
  */
 package io.trino.transaction;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.joda.JodaModule;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -404,6 +408,8 @@ public class InMemoryTransactionManager
                     // Should not happen normally
                     throw new IllegalStateException("Current transaction already committed");
                 }
+                log.info("Transaction already aborted transactionId: %s", transactionId);
+                logStackTrace(String.format("checkOpenTransaction: completedSuccessfully: %s", completedSuccessfully.get()));
                 throw new TrinoException(TRANSACTION_ALREADY_ABORTED, "Current transaction is aborted, commands ignored until end of transaction block");
             }
         }
@@ -486,6 +492,7 @@ public class InMemoryTransactionManager
         public synchronized ListenableFuture<Void> asyncCommit()
         {
             if (!completedSuccessfully.compareAndSet(null, true)) {
+                logStackTrace(String.format("asyncCommit: completedSuccessfully changed from non-null to %s", completedSuccessfully.get()));
                 if (completedSuccessfully.get()) {
                     // Already done
                     return immediateVoidFuture();
@@ -493,6 +500,7 @@ public class InMemoryTransactionManager
                 // Transaction already aborted
                 return immediateFailedFuture(new TrinoException(TRANSACTION_ALREADY_ABORTED, "Current transaction has already been aborted"));
             }
+            logStackTrace(String.format("asyncCommit: completedSuccessfully: %s", completedSuccessfully.get()));
 
             String commitBlockedReason = commitBlocked.get();
             if (commitBlockedReason != null) {
@@ -537,6 +545,7 @@ public class InMemoryTransactionManager
         public synchronized ListenableFuture<Void> asyncAbort()
         {
             if (!completedSuccessfully.compareAndSet(null, false)) {
+                logStackTrace(String.format("asyncAbort: completedSuccessfully changed from non-null to %s", completedSuccessfully.get()));
                 if (completedSuccessfully.get()) {
                     // Should not happen normally
                     return immediateFailedFuture(new IllegalStateException("Current transaction already committed"));
@@ -544,7 +553,14 @@ public class InMemoryTransactionManager
                 // Already done
                 return immediateVoidFuture();
             }
+            logStackTrace(String.format("asyncAbort: completedSuccessfully: %s", completedSuccessfully.get()));
             return abortInternal();
+        }
+
+        private void logStackTrace(String prefix) {
+            for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+                log.info("%s - %s", prefix, element.toString());
+            }
         }
 
         private synchronized ListenableFuture<Void> abortInternal()
@@ -574,7 +590,12 @@ public class InMemoryTransactionManager
                     .sorted()
                     .toList();
 
-            return new TransactionInfo(
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new Jdk8Module());
+            mapper.registerModule(new JavaTimeModule());
+            mapper.registerModule(new JodaModule());
+
+            TransactionInfo transactionInfo = new TransactionInfo(
                     transactionId,
                     isolationLevel,
                     readOnly,
@@ -584,6 +605,15 @@ public class InMemoryTransactionManager
                     catalogNames,
                     writtenCatalogName,
                     ImmutableSet.copyOf(activeCatalogs.keySet()));
+
+            try {
+                String json = mapper.writeValueAsString(transactionInfo);
+                log.info("getTransactionInfo details: %s", json);
+            } catch (Exception e) {
+                log.error("getTransactionInfo details error: %s", e.getMessage());
+            }
+
+            return transactionInfo;
         }
     }
 }
