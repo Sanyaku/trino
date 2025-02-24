@@ -152,7 +152,8 @@ public final class PredicateUtils
             Optional<BloomFilterStore> bloomFilterStore,
             DateTimeZone timeZone,
             int domainCompactionThreshold,
-            Optional<FileDecryptionContext> decryptionContext)
+            Optional<FileDecryptionContext> decryptionContext,
+            AtomicInteger filteredRowGroupFromBloomFilter)
             throws IOException
     {
         if (columnsMetadata.getRowCount() == 0) {
@@ -178,6 +179,7 @@ public final class PredicateUtils
         }
 
         if (bloomFilterStore.isPresent() && !indexPredicate.matches(bloomFilterStore.get(), domainCompactionThreshold)) {
+            filteredRowGroupFromBloomFilter.incrementAndGet();
             return false;
         }
 
@@ -208,25 +210,35 @@ public final class PredicateUtils
         int filteredRowGroup = 0;
         AtomicInteger filteredRowGroupFromBloomFilter = new AtomicInteger(0);
         for (BlockMetadata block : parquetMetadata.getBlocks(splitStart, splitLength)) {
-            for (int i = 0; i < parquetTupleDomains.size(); i++) {
-                TupleDomain<ColumnDescriptor> parquetTupleDomain = parquetTupleDomains.get(i);
-                TupleDomainParquetPredicate parquetPredicate = parquetPredicates.get(i);
-                Optional<ColumnIndexStore> columnIndex = getColumnIndexStore(dataSource, block, descriptorsByPath, parquetTupleDomain, options, parquetMetadata.getDecryptionContext());
-                Optional<BloomFilterStore> bloomFilterStore = getBloomFilterStore(dataSource, block, parquetTupleDomain, options, parquetMetadata.getDecryptionContext());
-                PrunedBlockMetadata columnsMetadata = createPrunedColumnsMetadata(block, dataSource.getId(), descriptorsByPath);
-                if (predicateMatches(
-                        parquetPredicate,
-                        columnsMetadata,
-                        dataSource,
-                        descriptorsByPath,
-                        parquetTupleDomain,
-                        columnIndex,
-                        bloomFilterStore,
-                        timeZone,
-                        domainCompactionThreshold,
-                        parquetMetadata.getDecryptionContext())) {
-                    rowGroupInfoBuilder.add(new RowGroupInfo(columnsMetadata, block.fileRowCountOffset(), columnIndex));
-                    break;
+            long blockStart = block.getStartingPos();
+            boolean splitContainsBlock = splitStart <= blockStart && blockStart < splitStart + splitLength;
+            if (splitContainsBlock) {
+                boolean doesPredicateMatch = false;
+                for (int i = 0; i < parquetTupleDomains.size(); i++) {
+                    TupleDomain<ColumnDescriptor> parquetTupleDomain = parquetTupleDomains.get(i);
+                    TupleDomainParquetPredicate parquetPredicate = parquetPredicates.get(i);
+                    Optional<ColumnIndexStore> columnIndex = getColumnIndexStore(dataSource, block, descriptorsByPath, parquetTupleDomain, options, parquetMetadata.getDecryptionContext());
+                    Optional<BloomFilterStore> bloomFilterStore = getBloomFilterStore(dataSource, block, parquetTupleDomain, options, parquetMetadata.getDecryptionContext());
+                    PrunedBlockMetadata columnsMetadata = createPrunedColumnsMetadata(block, dataSource.getId(), descriptorsByPath);
+                    if (predicateMatches(
+                            parquetPredicate,
+                            columnsMetadata,
+                            dataSource,
+                            descriptorsByPath,
+                            parquetTupleDomain,
+                            columnIndex,
+                            bloomFilterStore,
+                            timeZone,
+                            domainCompactionThreshold,
+                            parquetMetadata.getDecryptionContext(),
+                            filteredRowGroupFromBloomFilter)) {
+                        rowGroupInfoBuilder.add(new RowGroupInfo(columnsMetadata, block.fileRowCountOffset(), columnIndex));
+                        doesPredicateMatch = true;
+                        break;
+                    }
+                }
+                if (!doesPredicateMatch) {
+                    filteredRowGroup++;
                 }
             }
         }
