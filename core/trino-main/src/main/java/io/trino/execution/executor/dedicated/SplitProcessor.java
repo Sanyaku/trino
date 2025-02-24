@@ -39,7 +39,7 @@ class SplitProcessor
 {
     private static final Logger LOG = Logger.get(SplitProcessor.class);
 
-    private static final Duration SPLIT_RUN_QUANTA = new Duration(1, TimeUnit.SECONDS);
+    private static final Duration SPLIT_RUN_QUANTA = new Duration(2, TimeUnit.SECONDS);
 
     private final TaskId taskId;
     private final int splitId;
