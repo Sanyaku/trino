@@ -16,6 +16,7 @@ package io.trino.parquet.predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.trino.parquet.BloomFilterStore;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.trino.parquet.BloomFilterStore.getBloomFilterStore;
 import static io.trino.parquet.ParquetCompressionUtils.decompress;
@@ -78,6 +80,7 @@ public final class PredicateUtils
     // and when the dictionary does not eliminate a row-group, the work done to
     // decode the dictionary and match it with predicates is wasted.
     private static final int MAX_DICTIONARY_SIZE = 8096;
+    private static final Logger log = Logger.get(PredicateUtils.class);
 
     private PredicateUtils() {}
 
@@ -142,7 +145,8 @@ public final class PredicateUtils
             Optional<ColumnIndexStore> columnIndexStore,
             Optional<BloomFilterStore> bloomFilterStore,
             DateTimeZone timeZone,
-            int domainCompactionThreshold)
+            int domainCompactionThreshold,
+            AtomicInteger filteredRowGroupFromBloomFilter)
             throws IOException
     {
         if (columnsMetadata.getRowCount() == 0) {
@@ -168,6 +172,7 @@ public final class PredicateUtils
         }
 
         if (bloomFilterStore.isPresent() && !indexPredicate.matches(bloomFilterStore.get(), domainCompactionThreshold)) {
+            filteredRowGroupFromBloomFilter.incrementAndGet();
             return false;
         }
 
@@ -194,10 +199,13 @@ public final class PredicateUtils
             throws IOException
     {
         ImmutableList.Builder<RowGroupInfo> rowGroupInfoBuilder = ImmutableList.builder();
+        int filteredRowGroup = 0;
+        AtomicInteger filteredRowGroupFromBloomFilter = new AtomicInteger(0);
         for (BlockMetadata block : parquetMetadata.getBlocks(splitStart, splitLength)) {
             long blockStart = block.getStartingPos();
             boolean splitContainsBlock = splitStart <= blockStart && blockStart < splitStart + splitLength;
             if (splitContainsBlock) {
+                boolean doesPredicateMatch = false;
                 for (int i = 0; i < parquetTupleDomains.size(); i++) {
                     TupleDomain<ColumnDescriptor> parquetTupleDomain = parquetTupleDomains.get(i);
                     TupleDomainParquetPredicate parquetPredicate = parquetPredicates.get(i);
@@ -213,13 +221,20 @@ public final class PredicateUtils
                             columnIndex,
                             bloomFilterStore,
                             timeZone,
-                            domainCompactionThreshold)) {
+                            domainCompactionThreshold,
+                            filteredRowGroupFromBloomFilter)) {
                         rowGroupInfoBuilder.add(new RowGroupInfo(columnsMetadata, block.fileRowCountOffset(), columnIndex));
+                        doesPredicateMatch = true;
                         break;
                     }
                 }
+                if (!doesPredicateMatch) {
+                    filteredRowGroup++;
+                }
             }
         }
+        log.info("Skipped rowGroup for parquetFile: %s, totalFilteredRowGroup: %s, filteredRowGroupFromBloomFilter: %s, totalRowGroup: %s",
+                dataSource.getId(), filteredRowGroup, filteredRowGroupFromBloomFilter.get(), parquetMetadata.getBlocks().size());
         return rowGroupInfoBuilder.build();
     }
 

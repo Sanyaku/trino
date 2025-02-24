@@ -361,12 +361,12 @@ public class IcebergSplitSource
                 outputRowsLowerBound = saturatedAdd(outputRowsLowerBound, wholeFileTask.file().recordCount());
             }
 
-            if (fileHasNoDeletions && noDataColumnsProjected(wholeFileTask)) {
-                scanTaskBuilder.add(fileScanTaskWithDomain);
-            }
-            else {
-                scanTaskBuilder.addAll(fileScanTaskWithDomain.split(targetSplitSize));
-            }
+//            if (fileHasNoDeletions && noDataColumnsProjected(wholeFileTask)) {
+            scanTaskBuilder.add(fileScanTaskWithDomain);
+//            }
+//            else {
+//                scanTaskBuilder.addAll(fileScanTaskWithDomain.split(targetSplitSize));
+//            }
         }
         return scanTaskBuilder.build().iterator();
     }
