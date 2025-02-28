@@ -162,17 +162,26 @@ public class NodeStateManager
 
     private void requestGracefulShutdown()
     {
-        log.info("Shutdown requested");
+        String threadName = Thread.currentThread().getName();
+        log.info("Shutdown requested on thread [{}]", threadName);
         if (isCoordinator) {
             throw new UnsupportedOperationException("Cannot shutdown coordinator");
         }
 
         // wait for a grace period (so that shutting down state is observed by the coordinator) to start the shutdown sequence
-        shutdownHandler.schedule(this::shutdown, gracePeriod.toMillis(), MILLISECONDS);
+        shutdownHandler.schedule(() -> {
+            try {
+                log.info("Shutdown handler triggered on thread [{}]", Thread.currentThread().getName());
+                this.shutdown();
+            } catch (Throwable t) {
+                log.error("Error during shutdown handler execution", t);
+            }
+        }, gracePeriod.toMillis(), MILLISECONDS);
     }
 
     private void shutdown()
     {
+        log.info("Shutdown method called on thread [{}]", Thread.currentThread().getName());
         waitActiveTasksToFinish();
 
         terminate();
@@ -224,6 +233,7 @@ public class NodeStateManager
     {
         // At this point no new tasks should be scheduled by coordinator on this worker node.
         // Wait for all remaining tasks to finish.
+        log.info("Starting to wait for active tasks to finish for state: [{}] ", isShuttingDownOrDraining());
         while (isShuttingDownOrDraining()) {
             List<TaskInfo> activeTasks = getActiveTasks();
             log.info("Waiting for " + activeTasks.size() + " active tasks to finish");
