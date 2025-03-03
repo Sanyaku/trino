@@ -553,7 +553,8 @@ public class InMemoryTransactionManager
             return abortInternal();
         }
 
-        private void logStackTrace(String prefix) {
+        private void logStackTrace(String prefix)
+        {
             for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
                 log.debug("%s - %s", prefix, element.toString());
             }
