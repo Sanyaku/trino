@@ -395,6 +395,8 @@ class StatementClientV1
         long start = System.nanoTime();
         long attempts = 0;
 
+        log.debug("Starting executeRequest for task: %s at %s", taskName, start);
+
         while (true) {
             if (isClientAborted()) {
                 return false;
@@ -402,13 +404,19 @@ class StatementClientV1
 
             if (attempts > 0) {
                 Duration sinceStart = Duration.nanosSince(start);
+                log.debug("Retry attempt #%s for task: %s, elapsed time: %s ms and requestTimeout: %s ms", attempts, taskName, sinceStart.toMillis(), requestTimeoutNanos);
                 if (sinceStart.compareTo(requestTimeoutNanos) > 0) {
                     state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
                     throw new RuntimeException(format("Error fetching next (attempts: %s, duration: %s)", attempts, sinceStart), cause);
                 }
+
+                long sleepTimeMs = attempts * 100;
+                log.debug("Sleeping for %s ms before retry #%s for task: %s", sleepTimeMs, attempts, taskName);
+
                 // back-off on retry
                 try {
-                    MILLISECONDS.sleep(attempts * 100);
+                    long sleepTimeMs = MILLISECONDS.sleep(attempts * 100);
+                    log.debug("Woke up from sleep for retry #%s for task: %s", attempts, taskName);
                 }
                 catch (InterruptedException e) {
                     try {
@@ -423,9 +431,12 @@ class StatementClientV1
             }
             attempts++;
 
+            log.debug("Executing JSON request for attempt #%s for task: %s", attempts, taskName);
             JsonResponse<QueryResults> response;
             try {
                 response = JsonResponse.execute(QUERY_RESULTS_CODEC, httpCallFactory, request, materializedJsonSizeLimit);
+                log.debug("JSON request completed for attempt #%s for task: %s, took %s ms",
+                        attempts, taskName, Duration.nanosSince(start).toMillis());
             }
             catch (RuntimeException e) {
                 if (!isRetryable.apply(e)) {
@@ -446,7 +457,11 @@ class StatementClientV1
                 continue;
             }
 
+            log.debug("Going to process response for task: %s after %s attempts, total time: %s ms",
+                    taskName, attempts, Duration.nanosSince(start).toMillis());
             processResponse(response.getHeaders(), response.getValue());
+            log.debug("Successfully processed response for task: %s after %s attempts, total time: %s ms",
+                    taskName, attempts, Duration.nanosSince(start).toMillis());
             return true;
         }
     }
