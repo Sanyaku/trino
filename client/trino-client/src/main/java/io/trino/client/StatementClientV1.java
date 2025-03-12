@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
@@ -67,9 +68,10 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @ThreadSafe
-class StatementClientV1
+public class StatementClientV1
         implements StatementClient
 {
+    private static final Logger log = Logger.getLogger(StatementClientV1.class.getName());
     private static final MediaType MEDIA_TYPE_TEXT = MediaType.parse("text/plain; charset=utf-8");
     private static final JsonCodec<QueryResults> QUERY_RESULTS_CODEC = jsonCodec(QueryResults.class);
 
@@ -395,7 +397,7 @@ class StatementClientV1
         long start = System.nanoTime();
         long attempts = 0;
 
-        log.debug("Starting executeRequest for task: %s at %s", taskName, start);
+        log.info(String.format("Starting executeRequest for task: %s at %s", taskName, start));
 
         while (true) {
             if (isClientAborted()) {
@@ -404,19 +406,19 @@ class StatementClientV1
 
             if (attempts > 0) {
                 Duration sinceStart = Duration.nanosSince(start);
-                log.debug("Retry attempt #%s for task: %s, elapsed time: %s ms and requestTimeout: %s ms", attempts, taskName, sinceStart.toMillis(), requestTimeoutNanos);
+                log.info(String.format("Retry attempt #%s for task: %s, elapsed time: %s ms and requestTimeout: %s ms", attempts, taskName, sinceStart.toMillis(), requestTimeoutNanos));
                 if (sinceStart.compareTo(requestTimeoutNanos) > 0) {
                     state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
                     throw new RuntimeException(format("Error fetching next (attempts: %s, duration: %s)", attempts, sinceStart), cause);
                 }
 
                 long sleepTimeMs = attempts * 100;
-                log.debug("Sleeping for %s ms before retry #%s for task: %s", sleepTimeMs, attempts, taskName);
+                log.info(String.format("Sleeping for %s ms before retry #%s for task: %s", sleepTimeMs, attempts, taskName));
 
                 // back-off on retry
                 try {
-                    long sleepTimeMs = MILLISECONDS.sleep(attempts * 100);
-                    log.debug("Woke up from sleep for retry #%s for task: %s", attempts, taskName);
+                    MILLISECONDS.sleep(sleepTimeMs);
+                    log.info(String.format("Woke up from sleep for retry #%s for task: %s", attempts, taskName));
                 }
                 catch (InterruptedException e) {
                     try {
@@ -431,14 +433,14 @@ class StatementClientV1
             }
             attempts++;
 
-            log.debug("Executing JSON request for attempt #%s for task: %s", attempts, taskName);
+            log.info(String.format("Executing JSON request for attempt #%s for task: %s", attempts, taskName));
             JsonResponse<QueryResults> response;
             try {
                 response = JsonResponse.execute(QUERY_RESULTS_CODEC, httpCallFactory, request, materializedJsonSizeLimit);
-                log.debug("JSON request completed for attempt #%s for task: %s, took %s ms",
-                        attempts, taskName, Duration.nanosSince(start).toMillis())
-                log.debug("JSON response status code: %s with response body: %s produced and the hasValue is: %s with exception: %s",
-                        response.getStatusCode(), response.getResponseBody().orElse("<Response Too Large>"), response.hasValue(), response.getException().getMessage());
+                log.info(String.format("JSON request completed for attempt #%s for task: %s, took %s ms",
+                        attempts, taskName, Duration.nanosSince(start).toMillis()));
+                log.info(String.format("JSON response status code: %s with response body: %s produced and the hasValue is: %s with exception: %s",
+                        response.getStatusCode(), response.getResponseBody().orElse("<Response Too Large>"), response.hasValue(), response.getException().getMessage()));
             }
             catch (RuntimeException e) {
                 if (!isRetryable.apply(e)) {
@@ -449,8 +451,8 @@ class StatementClientV1
             }
             if (isTransient(response.getException())) {
                 cause = response.getException();
-                log.debug("Transient exception received for attempt #%s for task: %s: %s",
-                        attempts, taskName, response.getException().getMessage());
+                log.info(String.format("Transient exception received for attempt #%s for task: %s: %s",
+                        attempts, taskName, response.getException().getMessage()));
                 continue;
             }
             if (response.getStatusCode() != HTTP_OK || !response.hasValue()) {
@@ -458,15 +460,15 @@ class StatementClientV1
                     state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
                     throw requestFailedException(taskName, request, response);
                 }
-                log.debug("Will retry after receiving status code: %s", response.getStatusCode());
+                log.info(String.format("Will retry after receiving status code: %s", response.getStatusCode()));
                 continue;
             }
 
-            log.debug("Going to process response for task: %s after %s attempts, total time: %s ms",
-                    taskName, attempts, Duration.nanosSince(start).toMillis());
+            log.info(String.format("Going to process response for task: %s after %s attempts, total time: %s ms",
+                    taskName, attempts, Duration.nanosSince(start).toMillis()));
             processResponse(response.getHeaders(), response.getValue());
-            log.debug("Successfully processed response for task: %s after %s attempts, total time: %s ms",
-                    taskName, attempts, Duration.nanosSince(start).toMillis());
+            log.info(String.format("Successfully processed response for task: %s after %s attempts, total time: %s ms",
+                    taskName, attempts, Duration.nanosSince(start).toMillis()));
             return true;
         }
     }
