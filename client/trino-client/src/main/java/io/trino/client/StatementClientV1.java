@@ -447,6 +447,8 @@ class StatementClientV1
             }
             if (isTransient(response.getException())) {
                 cause = response.getException();
+                log.debug("Transient exception received for attempt #%s for task: %s: %s",
+                        attempts, taskName, response.getException().getMessage());
                 continue;
             }
             if (response.getStatusCode() != HTTP_OK || !response.hasValue()) {
@@ -454,6 +456,7 @@ class StatementClientV1
                     state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
                     throw requestFailedException(taskName, request, response);
                 }
+                log.debug("Will retry after receiving status code: %s", response.getStatusCode());
                 continue;
             }
 
