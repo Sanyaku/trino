@@ -436,7 +436,9 @@ class StatementClientV1
             try {
                 response = JsonResponse.execute(QUERY_RESULTS_CODEC, httpCallFactory, request, materializedJsonSizeLimit);
                 log.debug("JSON request completed for attempt #%s for task: %s, took %s ms",
-                        attempts, taskName, Duration.nanosSince(start).toMillis());
+                        attempts, taskName, Duration.nanosSince(start).toMillis())
+                log.debug("JSON response status code: %s with response body: %s produced and the hasValue is: %s with exception: %s",
+                        response.getStatusCode(), response.getResponseBody().orElse("<Response Too Large>"), response.hasValue(), response.getException().getMessage());
             }
             catch (RuntimeException e) {
                 if (!isRetryable.apply(e)) {
