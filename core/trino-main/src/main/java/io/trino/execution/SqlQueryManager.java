@@ -13,6 +13,10 @@
  */
 package io.trino.execution;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.joda.JodaModule;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.errorprone.annotations.ThreadSafe;
@@ -255,6 +259,17 @@ public class SqlQueryManager
     public void createQuery(QueryExecution queryExecution)
     {
         requireNonNull(queryExecution, "queryExecution is null");
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new Jdk8Module());
+        mapper.registerModule(new JavaTimeModule());
+        mapper.registerModule(new JodaModule());
+        try {
+            String json = mapper.writeValueAsString(queryExecution.getQueryInfo());
+            log.info("SqlQueryManager createdQuery: %s", json);
+        } catch (Exception e) {
+            log.error("SqlQueryManager createQuery error: %s", e.getMessage());
+        }
 
         if (!queryTracker.addQuery(queryExecution)) {
             throw new TrinoException(GENERIC_INTERNAL_ERROR, format("Query %s already registered", queryExecution.getQueryId()));
