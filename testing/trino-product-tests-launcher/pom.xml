@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>479</version>
+        <version>479-patched</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -111,7 +111,7 @@
             <exclusions>
                 <exclusion>
                     <!-- trino-main pulls a lot of dependencies pumping jar size, and we only need categories definitions defined in PluginReader class.
-                         Also, we want product-test-launcher to treat Trino as "blackbox" as possible, and having trino-main on classpath is not in line with that.-->
+                    Also, we want product-test-launcher to treat Trino as "blackbox" as possible, and having trino-main on classpath is not in line with that.-->
                     <groupId>io.trino</groupId>
                     <artifactId>trino-main</artifactId>
                 </exclusion>
@@ -190,7 +190,7 @@
                 <configuration>
                     <ignoredNonTestScopedDependencies>
                         <!-- allow assertj to be declared in compile scope even though it's only used in tests in this
-                             module. This is needed because trino-testing depends on assertj in compile scope -->
+                        module. This is needed because trino-testing depends on assertj in compile scope -->
                         <ignoredNonTestScopedDependency>org.assertj:assertj-core</ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
                 </configuration>
