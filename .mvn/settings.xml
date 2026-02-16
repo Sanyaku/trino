@@ -12,5 +12,10 @@
                 <njord.releaseUrl>njord:template:release-sca</njord.releaseUrl>
             </configuration>
         </server>
+        <server>
+            <id>sumo-jfrog</id>
+            <username>viruj.janweja</username>
+            <password>eyJ2ZXIiOiIyIiwidHlwIjoiSldUIiwiYWxnIjoiUlMyNTYiLCJraWQiOiI2Tm1XeUk0enQtb0JBSGZ6YmZfWmViY1dpQVQzUWNRNDdZT1RQNjdwa2xRIn0.eyJzdWIiOiJqZi1hcnRpZmFjdG9yeUA4MDViMzcyOC0wYjFlLTRjZjgtOGFiMy03ZDIzYjViOTYzMjIvdXNlcnMvdmlydWouamFud2VqYSIsInNjcCI6ImFwcGxpZWQtcGVybWlzc2lvbnMvdXNlciIsImF1ZCI6ImpmLWFydGlmYWN0b3J5QDgwNWIzNzI4LTBiMWUtNGNmOC04YWIzLTdkMjNiNWI5NjMyMiIsImlzcyI6ImpmLWFydGlmYWN0b3J5QDgwNWIzNzI4LTBiMWUtNGNmOC04YWIzLTdkMjNiNWI5NjMyMi91c2Vycy92aXJ1ai5qYW53ZWphIiwiaWF0IjoxNzcwOTczMDUyLCJqdGkiOiJmM2U3YTYxZi1lNjFjLTQ0MmEtOTc4OS05MDQ4ZmNjZWQyY2IiLCJ0aWQiOiJzdW1vbG9naWN1c3cxIn0.cZQh6lKtyAP1lErN7A_S_FuxPqVs5w9hfQj_yAUyBupqyuP29Ve9yZXMrrlEp0_C_As2H3ESe3gyqN-1wtRx-0bIHjYEE_TkMKLXJdYLZBXTKBwJzf40cZULYsV6D3NYTHVljd6t4QRNtUPjwAsNtOABz_Hu5w0Y9HzdpYINBGdKp4KdYgMjUyHpWeLJPPnOwhaOM_RXuzTxhuU7u6QOUYtsJpkir8d59WxsGRZj4XmNkUTIIy1BoP0RoNTJWjqTzh_CtiKOTvlDUplN4kcJpZmWv9jTrOA4ghJ-s0yZg_TU7YbisqS5I53hn8p5ih7CT5OfNLwYj-fryg60jD5QVQ</password>
+        </server>
     </servers>
 </settings>
