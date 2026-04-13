@@ -2101,6 +2101,7 @@ public class IcebergMetadata
                     .retainLast(expireSnapshotsHandle.retainLast())
                     .cleanExpiredMetadata(expireSnapshotsHandle.cleanExpiredMetadata())
                     .planWith(icebergScanExecutor)
+                    .cleanExpiredFiles(false)
                     .commit();
         }
         catch (NotFoundException e) {
