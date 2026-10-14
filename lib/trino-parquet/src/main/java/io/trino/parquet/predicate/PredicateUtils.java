@@ -210,7 +210,7 @@ public final class PredicateUtils
         int filteredRowGroup = 0;
         AtomicInteger filteredRowGroupFromBloomFilter = new AtomicInteger(0);
         for (BlockMetadata block : parquetMetadata.getBlocks(splitStart, splitLength)) {
-            long blockStart = block.getStartingPos();
+            long blockStart = block.columns().getFirst().getStartingPos();
             boolean splitContainsBlock = splitStart <= blockStart && blockStart < splitStart + splitLength;
             if (splitContainsBlock) {
                 boolean doesPredicateMatch = false;
