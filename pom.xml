@@ -39,7 +39,6 @@
         <module>core/trino-server-main</module>
         <module>core/trino-spi</module>
         <module>core/trino-web-ui</module>
-        <module>docs</module>
         <module>lib/trino-array</module>
         <module>lib/trino-cache</module>
         <module>lib/trino-filesystem</module>
@@ -130,7 +129,6 @@
         <module>testing/trino-product-tests-groups</module>
         <module>testing/trino-product-tests-launcher</module>
         <module>testing/trino-server-dev</module>
-        <module>testing/trino-test-jdbc-compatibility-old-driver</module>
         <module>testing/trino-test-jdbc-compatibility-old-server</module>
         <module>testing/trino-testing</module>
         <module>testing/trino-testing-containers</module>
